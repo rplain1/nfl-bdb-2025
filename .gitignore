@@ -2,3 +2,5 @@
 raw-data/
 *.duckdb
 *.wal
+.env
+venv/
