@@ -1,19 +1,7 @@
 import duckdb
-import polars as pl
-import os
-import glob
+from globals.globals import DB_PATH
 
-PATH = 'raw-data/*.csv'
-files = glob.glob(PATH)
-
-
-{
-    'games':"raw-data/games.csv",
-    'player_play': "raw-data/player_play.csv",
-    'players': "raw-data/players.csv",
-    'plays': "raw-data/plays.csv",
-    'tracking': "raw-data/tracking_*.csv",
-}
+con = duckdb.connect(DB_PATH)
 
 
 con = duckdb.connect(database='data/bdb.duckdb')
@@ -21,7 +9,7 @@ con.execute(
     """
     DROP TABLE IF EXISTS tracking;
     CREATE TABLE tracking AS
-    SELECT * FROM read_csv_auto('raw-data/tracking*.csv')
+    SELECT * FROM read_csv_auto('raw-data/tracking*.csv', nullstr='NA')
 """
 )
 con.execute(
