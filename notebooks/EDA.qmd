@@ -1,0 +1,20 @@
+
+```{r}
+library(tidyverse)
+library(duckdb)
+
+con <- dbConnect(duckdb(), 'data/bdb.duckdb')
+tbl(con, "tracking_clean")
+```
+
+
+
+```{r}
+tbl(con, "tracking_clean") |>
+  filter(gameId == 2022090800, playId == 56, frameType == "SNAP") |>
+  collect() |>
+  ggplot(aes(x, y, color = club)) +
+  geom_point() +
+  xlim(c(0, 120)) +
+  ylim(c(0, 53.3))
+```
