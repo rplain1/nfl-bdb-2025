@@ -14,7 +14,7 @@ source("https://raw.githubusercontent.com/mlfurman3/gg_field/main/gg_field.R")
 
 ```{r}
 d <- tbl(con, "tracking_clean") |>
-  filter(gameId == 2022090800, playId == 56) |>
+  filter(gameId == 2022091800, playId == 1108) |>
   left_join(tbl(con, "plays")) |>
   collect()
 
@@ -40,19 +40,21 @@ anim <- ggplot() +
   scale_shape_manual(values = shape_vals, guide = FALSE) +
   scale_fill_manual(values = cols_fill, guide = FALSE) +
   scale_colour_manual(values = cols_col, guide = FALSE) +
-  geom_point(data = d, aes(x, y, shape = team, fill = team, group = nflId, size = team, color = team)) +
+  geom_point(data = d, aes(x, y, shape = club, fill = club, group = nflId, size = club, color = club)) +
+  geom_segment(aes(x = x, y = y, xend = x_end, yend = y_end), data = d) +
   geom_text(
     data = d,
     aes(x = x, y = y, label = jerseyNumber),
     colour = "white",
     vjust = 0.36, size = 3.5
   ) +
+  labs(title = plot_title) +
   transition_time(frameId) +
   ease_aes("linear") +
   NULL
 
 anim_save(
-  "./ExamplePlay.gif",
+  "plays/ExamplePlay.gif",
   animate(anim,
     width = 720, height = 440,
     fps = 10, nframe = nFrames
@@ -61,7 +63,53 @@ anim_save(
 
 ```
 
+## Motion rates
 
 ```{r}
+ftn <- nflreadr::load_ftn_charting(2022)
+pbp <- nflreadr::load_pbp(2022)
+
+nflverse_motion <- pbp |>
+  filter(special == 0, week <= 9) |>
+  count(game_id, old_game_id, play_id, posteam, pass_attempt) |>
+  left_join(ftn |> select(game_id = nflverse_game_id, play_id = nflverse_play_id, is_motion)) |>
+  group_by(posteam) |>
+  summarise(
+    plays = n(),
+    motion = sum(is_motion, na.rm = TRUE) / n()
+  ) |>
+    arrange(-motion)
+```
+
+
+```{r}
+plays <- tbl(con, "plays")
+player_play <- tbl(con, "player_play")
+
+tracking_motion <- plays |>
+  left_join(player_play, by = c("gameId", "playId")) |>
+  mutate(motion = motionSinceLineset) |>
+  group_by(possessionTeam, gameId, playId) |>
+  summarise(
+    players = n(),
+    motion = max(as.numeric(motion))
+  ) |>
+  collect() |>
+  group_by(possessionTeam) |>
+  summarise(plays = n(), motion = sum(motion, na.rm = TRUE)) |>
+  mutate(motion_rate = motion / plays) |>
+  arrange(-motion_rate)
+
+
+df_motion <- nflverse_motion |>
+  left_join(tracking_motion, by = c('posteam' = 'possessionTeam'), suffix = c('.nflverse', '.ngs')) |>
+  select(-motion.ngs) |>
+  rename(motion.ngs = motion_rate)
+
+df_motion |>
+  ggplot(aes(motion.nflverse, motion.ngs)) +
+  geom_point() +
+  coord_cartesian(c(0.1, 0.75), c(0.1, 0.75)) +
+  geom_abline(slope = 1, intercept = 0)
 
 ```
