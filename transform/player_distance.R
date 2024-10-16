@@ -58,6 +58,7 @@ df_positions |>
 
 ###
 
+dbExecute(con, "drop table if exists position_distance_staging")
 tbl(con, "tracking_clean") |>
   select(gameId, playId, nflId, frameId, club, x, y) |>
   left_join(tbl(con, "players") |> select(nflId, position)) |>
@@ -73,24 +74,35 @@ tbl(con, "tracking_clean") |>
     )
   ) |>
   mutate(
-    rn = sql('ROW_NUMBER() OVER (PARTITION BY frameId, position_group ORDER BY y)')
+    rn = sql('ROW_NUMBER() OVER (PARTITION BY gameId, playId, frameId, position_group ORDER BY y)')
   ) |>
   mutate(
     pos_unique = if_else(position_group == 'FOOTBALL', 'football', paste0(position_group, rn))
   ) |>
   compute(name = 'position_distance_staging', temporary = FALSE, overwrite = TRUE)
 
+dbDisconnect(con)
+
+
+con <- dbConnect(duckdb(), 'data/bdb.duckdb')
+
 
 tbl(con, "position_distance_staging") |>
   select(gameId, playId, nflId, frameId, pos_unique, x, y) |>
-  cross_join(
-    tbl(con, "staging_position_distance") |>
+  left_join(
+    tbl(con, "position_distance_staging") |>
       select(gameId, playId, nflId, frameId, pos_unique, x, y),
+    by = c('gameId', 'playId', 'frameId'),
     suffix = c('', '_join')
   ) |>
+  compute(name = "position_distance_staging_large", temporary = TRUE, overwrite = TRUE)
+
+
+
+tbl(con, "position_distance_staging_large") |>
   mutate(
     distance = sql('SQRT(POWER(x - x_join, 2) + POWER(y - y_join, 2))')
   ) |>
   select(gameId, playId, nflId, frameId, pos_unique, pos_unique_join, distance) |>
-  #pivot_wider(id_cols = c(gameId, playId, nflId, frameId, pos_unique), names_from = pos_unique_join, values_from = distance) |>
+  pivot_wider(id_cols = c(gameId, playId, nflId, frameId, pos_unique), names_from = pos_unique_join, values_from = distance)
   compute(name = 'position_distance_long', temporary = FALSE, overwrite = TRUE)

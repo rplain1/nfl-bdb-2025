@@ -2,7 +2,7 @@ library(tidyverse)
 library(duckdb)
 
 con <- dbConnect(duckdb(), "data/bdb.duckdb")
-tbl(con, "tracking_clean")
+tbl(con, "tracking")
 
 
 tbl(con, "tracking") |>

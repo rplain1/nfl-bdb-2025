@@ -159,14 +159,21 @@ watch_film <- function(game_id, play_id) {
     NULL
 
   anim_save(
-    paste(glue::glue("plays/{d$playDescripton}.gif)")),
+    paste0("plays/unique(plot_title).gif"),
     animate(anim,
       width = 720, height = 440,
       fps = 10, nframe = nFrames
     )
   )
+
+
 }
 
+```
+
+```{r}
+tbl(con, "tracking_clean") |>
++     left_join(tbl(con, "plays")) |> filter(pff_manZone == 'Zone') |> count(gameId, playId, expectedPointsAdded) |> arrange(-expectedPointsAdded)
 ```
 
 
