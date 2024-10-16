@@ -21,9 +21,12 @@ tbl(con, "tracking") |>
     s_y = dir_y * s,
     # Get directional acceleration
     a_x = dir_x * a,
-    a_y = dir_y * a
+    a_y = dir_y * a,
+
+    x_end = s*cos((90 - dir)*pi / 180) + x,
+    y_end = s*sin((90 - dir)*pi / 180) + y,
   ) |>
   compute(name = "tracking_clean", temporary = FALSE, overwrite = TRUE)
 
 tbl(con, "tracking_clean") |>
-  select(a_x, a_y)
+  select(a_x, a_y, x_end)
