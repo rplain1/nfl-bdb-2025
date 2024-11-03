@@ -84,8 +84,106 @@ tbl(con, "tracking_clean") |>
 watch_film(2022091800, 3547)
 ```
 
-
+### Offensive Scheme
 
 ```{r}
+tbl(con, "plays") |>
+  filter(!is.na(offenseFormation)) |>
+  select(ends_with("Id"), possessionTeam, offenseFormation, receiverAlignment, playAction, isDropback) |>
+  left_join(
+    tbl(con, "player_play") |>
+      select(ends_with("Id"), teamAbbr, motionSinceLineset, inMotionAtBallSnap),
+    by = c("gameId", "playId")
+  ) |>
+  select(-starts_with("pff")) |>
+  collect() -> df_motion
 
+
+df_motion |>
+  filter(possessionTeam == teamAbbr) |>
+  count(receiverAlignment)
+
+
+tbl(con, "tracking_range") |>
+  filter(club != "football") |>
+  left_join(tbl(con, "plays") |> select(gameId, playId, possessionTeam)) |>
+  mutate(
+    possessionTeam = possessionTeam == club
+  )
+
+# Sanity check there is only 1 snap event per play and frame
+tbl(con, "tracking_clean") |>
+  filter(frameType == "SNAP") |>
+  count(gameId, playId, nflId, frameId, frameType, sort = TRUE)
+
+# looks like every play has a lineset
+dbGetQuery(con, "
+select
+  t.gameId
+  , t.playId
+  , t.club
+  , count(distinct t.playId) play
+  , count(distinct case when t.event == 'line_set' then t.playId else NULL end) linesets
+from tracking_clean t
+inner join plays on plays.playId = t.playId and plays.gameId = t.gameId and plays.possessionTeam = t.club
+group by all
+
+") |>
+  as_tibble() |>
+  arrange(-linesets)
+
+tbl(con, "tracking_clean") |>
+  filter(frameType == "AFTER_SNAP") |>
+  group_by(gameId, playId)
+
+
+
+# looks like every play has a lineset
+dbExecute(con, "
+
+  DROP TABLE IF EXISTS tracking_snap_2s;
+  CREATE TABLE tracking_snap_2s AS
+  select
+  t.*
+  , snap.snap_frame
+  , frameId - snap_frame as frame_from_snap
+  from tracking_clean t
+  inner join plays on plays.playId = t.playId and plays.gameId = t.gameId and plays.possessionTeam = t.club
+  left join (select playId, gameId, max(frameId) snap_frame from tracking_clean where frameType = 'SNAP' group by all) snap on snap.playId = t.playId and snap.gameId = t.gameId
+
+  WHERE snap_frame - frameId BETWEEN -20 AND 20
+
+
+
+")
+
+tbl(con, "tracking_snap_2s") |>
+  group_by(club, gameId, playId, frameType) |>
+  summarise(
+    across(c(x, y), list(min=min, max=max))
+  ) |>
+    group_by(club, frameType) |>
+    summarise(
+      across(c(starts_with('x'), starts_with('y')), list(mean=mean)),
+      .groups = 'drop'
+    ) |>
+      collect() -> df
+
+df |>
+  mutate(x = x_max_mean - x_min_mean, y = y_max_mean - y_min_mean) |>
+  pivot_wider(
+    id_cols = club,
+    names_from = frameType,
+    values_from = y
+  ) |>
+    mutate(
+      delta = AFTER_SNAP - BEFORE_SNAP,
+      BEFORE_SNAP_OE = BEFORE_SNAP - mean(BEFORE_SNAP),
+      AFTER_SNAP_OE = AFTER_SNAP - mean(AFTER_SNAP)
+    ) |>
+      arrange(-BEFORE_SNAP_OE) |>
+      ggplot(aes(BEFORE_SNAP, AFTER_SNAP)) +
+      geom_point() +
+      ggrepel::geom_text_repel(aes(label = club)) +
+      geom_smooth(method = 'lm')
 ```

@@ -34,3 +34,17 @@ tbl(con, "tracking") |>
 
 tbl(con, "tracking_clean") |>
   select(a_x, a_y, x_end)
+
+tbl(con, "tracking_clean") |>
+  group_by(gameId, playId, frameId, club) |>
+  summarise(
+    x_min = min(x, na.rm = TRUE),
+    x_max = max(x, na.rm = TRUE),
+    y_min = min(y, na.rm = TRUE),
+    y_max = max(y, na.rm = TRUE)
+  ) |>
+  mutate(
+    x_range = x_max - x_min,
+    y_range = y_max - y_min
+  ) |>
+  compute(name = "tracking_range")
