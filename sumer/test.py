@@ -5,11 +5,11 @@ plays_df = prep.get_plays_df()
 
 # Model parameters
 feature_len = 5  # Adjust this as needed based on input data
-model_dim = 64  # Dimension of transformer model (adjustable)
+model_dim = 32  # Dimension of transformer model (adjustable)
 num_layers = 4  # Number of transformer layers (adjustable)
 dropout = 0.01
 learning_rate = 1e-3
-batch_size = 64
+batch_size = 32
 output_dim =  plays_df.to_pandas()['offenseFormation'].nunique()
 
 prep.main()
@@ -25,10 +25,10 @@ val_dataset = load_datasets(model_type='transformer', split='val')
 test_dataset = load_datasets(model_type='transformer', split='test')
 
 # Create DataLoader objects
-batch_size = 64
+batch_size = 32
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=3)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=3)
-test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=3)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=3)
 
 # Print feature and target shapes from DataLoaders
 for batch in train_loader:
@@ -77,7 +77,7 @@ early_stop_callback = EarlyStopping(
 # Initialize the trainer
 trainer = Trainer(
    max_epochs=20,  # Adjust the number of epochs
-   accelerator="gpu",  # Use 'gpu' if CUDA is available, otherwise use 'cpu'
+   accelerator="cpu",  # Use 'gpu' if CUDA is available, otherwise use 'cpu'
    devices=1,
    callbacks=[checkpoint_callback, early_stop_callback],
 )
@@ -134,22 +134,6 @@ df_test_ball_snap = df_test_ball_snap.sort_values(['gameId', 'playId', 'mirrored
 
 true_labels = df_test_ball_snap['true_labels'].values
 predicted_labels = df_test_ball_snap['predicted_labels'].values
-
-
-
-
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
-plt.rcParams['font.family'] = 'Times New Roman'
-
-# Get class labels from FORMATION_ENUM and sort alphabetically
-formation_labels = sorted(list(process_datasets.FORMATION_ENUM.keys()))
-
-# Print unique values to debug
-print("Unique values in true labels:", np.unique(true_labels))
-print("Unique values in predicted labels:", np.unique(predicted_labels))
-print("Formation enum values:", process_datasets.FORMATION_ENUM)
 
 
 

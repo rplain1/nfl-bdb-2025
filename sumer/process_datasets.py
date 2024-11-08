@@ -26,8 +26,8 @@ import polars as pl
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-PREPPED_DATA_DIR = Path("/kaggle/working/split_prepped_data/")
-DATASET_DIR = Path("/kaggle/working/datasets/")
+PREPPED_DATA_DIR = Path("split_prepped_data/")
+DATASET_DIR = Path("datasets/")
 
 FORMATION_ENUM = {
     "EMPTY": 0,
@@ -164,7 +164,7 @@ class BDB2025_Dataset(Dataset):
         """
         Transform target DataFrame to numpy array.
         Args:
-            tgt_df (pd.DataFrame): Target DataFrame 
+            tgt_df (pd.DataFrame): Target DataFrame
         Returns:
             np.ndarray: Transformed target values as one-hot encoded array
         """

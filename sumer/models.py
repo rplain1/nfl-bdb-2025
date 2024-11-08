@@ -99,7 +99,7 @@ class SportsTransformer(nn.Module):
             nn.LayerNorm(model_dim // 4),
             nn.Linear(model_dim // 4, output_dim),  # Adjusted to match target shape
         )
- 
+
     def forward(self, x: Tensor) -> Tensor:
         """
         Forward pass of the SportsTransformer.
@@ -127,7 +127,7 @@ class SportsTransformer(nn.Module):
 
         # Decode to predict output
         x = self.decoder(x)  # [B,M] -> [B, output_dim]
-        
+
         return x
 
 class SportsTransformerLitModel(LightningModule):
@@ -256,4 +256,3 @@ class SportsTransformerLitModel(LightningModule):
             AdamW: Configured optimizer.
         """
         return AdamW(self.parameters(), lr=self.learning_rate)
-    
