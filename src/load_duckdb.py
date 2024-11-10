@@ -1,8 +1,4 @@
 import duckdb
-from globals.globals import DB_PATH
-
-con = duckdb.connect(DB_PATH)
-
 
 con = duckdb.connect(database='data/bdb.duckdb')
 con.execute(
