@@ -23,11 +23,27 @@ Functions:
 
 from argparse import ArgumentParser
 from pathlib import Path
-
+import nfl_data_py as nfl
 import polars as pl
 
-INPUT_DATA_DIR = Path("data/")
+INPUT_DATA_DIR = Path("raw-data/")
 OUT_DIR = Path("split_prepped_data/")
+
+
+def get_nflverse_pbp() -> pl.DataFrame:
+    return (
+        pl.read_parquet("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2022.parquet")
+        .with_columns(
+            pl.col("old_game_id").cast(pl.Int64),
+            pl.col("play_id").cast(pl.Int64),
+            play_type_nflverse=pl.when(pl.col("pass") == 1)
+            .then(pl.lit("pass"))
+            .when(pl.col("rush") == 1)
+            .then(pl.lit("run"))
+            .otherwise(pl.lit(None)),
+        )
+        .rename({"old_game_id": "gameId", "play_id": "playId"})
+    )
 
 
 def get_players_df() -> pl.DataFrame:
@@ -42,7 +58,7 @@ def get_players_df() -> pl.DataFrame:
         .with_columns(
             height_inches=(
                 pl.col("height").str.split("-").map_elements(lambda s: int(s[0]) * 12 + int(s[1]), return_dtype=int)
-            )
+            ),
         )
         .with_columns(
             weight_Z=(pl.col("weight") - pl.col("weight").mean()) / pl.col("weight").std(),
@@ -67,6 +83,22 @@ def get_plays_df() -> pl.DataFrame:
     )
 
 
+def get_player_play_df() -> pl.DataFrame:
+    """
+    Load play-level data and preprocesses features.
+
+    Returns:
+        pl.DataFrame: Preprocessed play data with additional features.
+    """
+    return pl.read_csv(INPUT_DATA_DIR / "player_play.csv", null_values=["NA", "nan", "N/A", "NaN", ""]).with_columns(
+        distanceToGoal=(
+            pl.when(pl.col("possessionTeam") == pl.col("yardlineSide"))
+            .then(100 - pl.col("yardlineNumber"))
+            .otherwise(pl.col("yardlineNumber"))
+        )
+    )
+
+
 def get_tracking_df() -> pl.DataFrame:
     """
     Load tracking data and preprocesses features. Notably, exclude rows representing the football's movement.
@@ -82,9 +114,7 @@ def get_tracking_df() -> pl.DataFrame:
 
 
 def add_features_to_tracking_df(
-    tracking_df: pl.DataFrame,
-    players_df: pl.DataFrame,
-    plays_df: pl.DataFrame,
+    tracking_df: pl.DataFrame, players_df: pl.DataFrame, plays_df: pl.DataFrame, nflverse_pbp_df: pl.DataFrame
 ) -> pl.DataFrame:
     """
     Consolidates play and player level data into the tracking data.
@@ -101,6 +131,9 @@ def add_features_to_tracking_df(
     og_len = len(tracking_df)
     tracking_df = (
         tracking_df.join(
+            nflverse_pbp_df.select("gameId", "playId", "play_type_nflverse"), on=["gameId", "playId"], how="left"
+        )
+        .join(
             plays_df.select(
                 "gameId",
                 "playId",
@@ -111,11 +144,11 @@ def add_features_to_tracking_df(
             on=["gameId", "playId"],
             how="inner",
         )
-        #.join(
-        #    players_df.select(["nflId", "weight_Z", "height_Z"]).unique(),
-        #    on="nflId",
-        #    how="inner",
-        #)
+        .join(
+            players_df.select(["nflId", "weight_Z", "height_Z", "position"]).unique(),
+            on="nflId",
+            how="inner",
+        )
         .with_columns(
             side=pl.when(pl.col("club") == pl.col("possessionTeam"))
             .then(pl.lit(1))
@@ -228,13 +261,39 @@ def get_offenseFormation(tracking_df: pl.DataFrame, plays_df: pl.DataFrame) -> p
         how="inner",
     )
 
-    offenseFormation_df = (tracking_df[["gameId", "playId", "mirrored", "frameId", "offenseFormation"]]
-       .unique()  # Polars equivalent of drop_duplicates()
+    offenseFormation_df = (
+        tracking_df[
+            ["gameId", "playId", "mirrored", "frameId", "offenseFormation"]
+        ].unique()  # Polars equivalent of drop_duplicates()
     )
 
     tracking_df = tracking_df.drop(["offenseFormation"])
 
     return offenseFormation_df, tracking_df
+
+
+def get_play_type(tracking_df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Generate target dataframe for offenseFormation prediction.
+
+    Args:
+        tracking_df (pl.DataFrame): Tracking data
+
+    Returns:
+        tuple: tuple containing offenseFormation coverage
+    """
+
+    # drop rows where offenseFormation is None
+    tracking_df = tracking_df.filter(pl.col("play_type_nflverse").is_not_null())
+    play_type_df = (
+        tracking_df[
+            ["gameId", "playId", "mirrored", "frameId", "play_type_nflverse"]
+        ].unique()  # Polars equivalent of drop_duplicates()
+    )  # Polars equivalent of drop_duplicates()
+
+    tracking_df = tracking_df.drop(["play_type_nflverse"])
+
+    return play_type_df, tracking_df
 
 
 def split_train_test_val(tracking_df: pl.DataFrame, target_df: pl.DataFrame) -> dict[str, pl.DataFrame]:
@@ -292,7 +351,6 @@ def split_train_test_val(tracking_df: pl.DataFrame, target_df: pl.DataFrame) -> 
     }
 
 
-
 def main():
     """
     Main execution function for data preparation.
@@ -311,10 +369,12 @@ def main():
     print("Load tracking")
     tracking_df = get_tracking_df()
     print("tracking_df rows:", len(tracking_df))
-
+    print("Load nflverse")
+    nflverse_pbp_df = get_nflverse_pbp()
     print("Add features to tracking")
-    tracking_df = add_features_to_tracking_df(tracking_df, players_df, plays_df)
+    tracking_df = add_features_to_tracking_df(tracking_df, players_df, plays_df, nflverse_pbp_df)
     del players_df
+    del nflverse_pbp_df
     print("Convert tracking to cartesian")
     tracking_df = convert_tracking_to_cartesian(tracking_df)
     print("Standardize play direction")
@@ -323,11 +383,11 @@ def main():
     tracking_df = augment_mirror_tracking(tracking_df)
 
     print("Generate target - offenseFormation")
-    offenseFormation_df, rel_tracking_df = get_offenseFormation(tracking_df, plays_df)
-
+    # offenseFormation_df, rel_tracking_df = get_offenseFormation(tracking_df, plays_df)
+    play_type_df, rel_tracking_df = get_play_type(tracking_df)
     print("Split train/test/val")
-    split_dfs = split_train_test_val(rel_tracking_df, offenseFormation_df)
-
+    # split_dfs = split_train_test_val(rel_tracking_df, offenseFormation_df)
+    split_dfs = split_train_test_val(rel_tracking_df, play_type_df)
     out_dir = Path(OUT_DIR)
     out_dir.mkdir(exist_ok=True, parents=True)
 
@@ -337,6 +397,9 @@ def main():
 
 
 if __name__ == "__main__":
-    #main()
-    import os
-    print(os.getcwd())
+    main()
+    # import os
+    # import duckdb
+
+    # with duckdb.connect(INPUT_DATA_DIR / "bdb.duckdb") as con:
+    #     print(con.sql("select pff_defensiveCoverageAssignment, count(*) n from player_play group by 1 order by 2 desc"))
