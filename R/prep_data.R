@@ -1,5 +1,7 @@
 library(data.table)
 
+INPUT_DIR <- 'raw-data'
+
 get_tracking_dt <- function() {
   tracking <- fread('raw-data/tracking_week_1.csv', na.strings = 'NA')
   tracking <- tracking[displayName != "football"]
@@ -70,7 +72,6 @@ convert_tracking_to_cartesian <- function(tracking) {
     o = ((o - 90) * -1) %% 360
   )]
 
-  # Convert polar vectors to cartesian coordinates
   tracking[, `:=`(
     vx = s * cos(dir * pi / 180), # Convert dir to radians for cos
     vy = s * sin(dir * pi / 180), # Convert dir to radians for sin
@@ -132,8 +133,8 @@ get_offense_formation <- function(tracking, plays) {
     on=.(gameId, playId),
     nomatch=NULL
   ]
-  message("here")
-  offense_formation <- unique(tracking[, c('gameId', 'playId', 'mirrored', 'offenseFormation')])
+
+  offense_formation <- unique(tracking[, c('gameId', 'playId', 'mirrored', 'frameId', 'offenseFormation')])
 
   tracking <- tracking[, "offenseFormation" := NULL]
 
@@ -144,7 +145,7 @@ get_offense_formation <- function(tracking, plays) {
 }
 
 
-split_data <- function(tracking, keycols = c("gameId", "playId", 'mirrored')) {
+split_data <- function(tracking, keycols = c("gameId", "playId", 'mirrored', 'frameId')) {
   #checkmate::assert_character(keycols)
   ids <- unique(tracking[,..keycols])
   #setorder(tracking, gameId, playId, mirrored, frameId)
@@ -190,7 +191,7 @@ lapply(names(ids), function(id_name) {
   message("Processing ", id_name)
   lapply(names(train_target_data), function(data_name) {
     # join keys
-    keycols <- c('gameId','playId', 'mirrored')
+    keycols <- c('gameId','playId', 'mirrored', 'frameId')
     #inner join
     tmp <- process_split_data(train_target_data, data_name, ids[[id_name]], keycols)
     data_name <- ifelse(data_name == 'tracking_df','features', 'targets')
