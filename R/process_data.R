@@ -39,7 +39,7 @@ test_loader <- torch::dataloader(bdb_dataset, batch_size =  64, shuffle = TRUE)
 # Iterate through the dataloader and print the shapes
 # we can then loop trough the elements of the dataloader with
 # pulled from https://torch.mlverse.org/docs/articles/examples/dataset
-coro::loop(for(batch in dl) {
+coro::loop(for(batch in test_loader) {
   cat("X size:  ")
   print(batch[[1]]$size())
   cat("Y size:  ")
