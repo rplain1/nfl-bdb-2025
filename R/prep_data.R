@@ -1,13 +1,13 @@
 library(data.table)
 
-INPUT_DIR <- 'raw-data'
-
+# get tracking / change if you want more than 1 week
 get_tracking_dt <- function() {
   tracking <- fread('raw-data/tracking_week_1.csv', na.strings = 'NA')
   tracking <- tracking[displayName != "football"]
   tracking
 }
 
+# get players data, convert height and weight to Z values
 get_players_dt <- function() {
   if (!file.exists('raw-data/players.csv')) {
     stop("File 'raw-data/players.csv' does not exist.")
@@ -26,6 +26,7 @@ get_players_dt <- function() {
   players
 }
 
+# get plays and modify the distance to goal
 get_plays_dt <- function() {
   plays <- fread('raw-data/plays.csv', na.strings = 'NA')
 
@@ -38,6 +39,7 @@ get_plays_dt <- function() {
   plays
 }
 
+# join tracking with other data, assign side for flipping to align everything later
 clean_tracking <- function(tracking, plays, players) {
   checkmate::assert_data_table(tracking)
 
@@ -59,11 +61,10 @@ clean_tracking <- function(tracking, plays, players) {
   tracking[,"possessionTeam":=NULL]
 
   checkmate::assert_true(og_len == nrow(tracking))
-  # Transformations
-
   tracking
 }
 
+# map values to unit circle
 convert_tracking_to_cartesian <- function(tracking) {
   checkmate::assert_data_table(tracking)
 
@@ -82,6 +83,7 @@ convert_tracking_to_cartesian <- function(tracking) {
   tracking
 }
 
+# do all of the standardization so the plays are all oriented right
 standardize_tracking_directions <- function(tracking) {
   checkmate::assert_data_table(tracking)
 
@@ -96,6 +98,7 @@ standardize_tracking_directions <- function(tracking) {
   tracking
 }
 
+# duplicate the dataset by created a mirrored world across y-axis
 augment_mirror_tracking <- function(tracking) {
   checkmate::assert_data_table(tracking)
   checkmate::assert_true(nrow(tracking) > 0)
@@ -118,10 +121,12 @@ augment_mirror_tracking <- function(tracking) {
 
 }
 
+# method to sample keys for test/train
 sample_rows <- function(d) {
     d[sample(nrow(d), size = ceiling(nrow(d)/2)), ]
 }
 
+# default function to get the y value of offenseFormation from Sumer
 get_offense_formation <- function(tracking, plays) {
   checkmate::assert_data_table(tracking)
   checkmate::assert_data_table(plays)
@@ -144,7 +149,8 @@ get_offense_formation <- function(tracking, plays) {
   )
 }
 
-
+# split the data into train, validation, and test datasets.
+# returns a list of keys for each
 split_data <- function(tracking, keycols = c("gameId", "playId", 'mirrored', 'frameId')) {
   #checkmate::assert_character(keycols)
   ids <- unique(tracking[,..keycols])
@@ -187,6 +193,7 @@ process_split_data <- function(data_list, data_name, ids, keycols) {
   return(result)
 }
 
+# loop over the combination of train/val/test and feature/target datasets
 lapply(names(ids), function(id_name) {
   message("Processing ", id_name)
   lapply(names(train_target_data), function(data_name) {

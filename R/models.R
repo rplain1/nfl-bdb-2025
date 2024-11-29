@@ -1,7 +1,7 @@
 library(torch)
 
-# creates example tensors. x requires_grad = TRUE tells that
-# we are going to take derivatives over it.
+# replicate Sumer sports transformer
+# Note: transformers not available yet in torch for R
 sports_transformer <- nn_module(
   clasname = "sports_transformer",
   # the initialize function tuns whenever we instantiate the model
@@ -13,8 +13,6 @@ sports_transformer <- nn_module(
     dropout
   ) {
 
-    # just for you to see when this function is called
-    cat("Calling initialize!")
     dim_feedforward <- model_dim * 4
     num_heads <- min(16, max(2, 2 * round(model_dim / 64)))
     self$hyper_params <- list(
@@ -55,6 +53,7 @@ sports_transformer <- nn_module(
     )
 
   },
+
   # this function is called whenever we call our model on input.
   forward = function(x) {
     # batch_size

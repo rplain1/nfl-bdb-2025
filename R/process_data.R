@@ -23,20 +23,22 @@ BDB2025_Dataset <- torch::dataset(
   }
 )
 
-# Example usage (assuming feature_df and tgt_df are your preprocessed data.tables):
+# load to dataset object
 feature_df <- arrow::read_parquet('split_prepped_data/test_features.parquet')
 tgt_df <- arrow::read_parquet('split_prepped_data/test_targets.parquet')
 set(tgt_df, j = ncol(tgt_df), value = as.numeric(factor(tgt_df[[ncol(tgt_df)]])))
-d <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
+bdb_dataset <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
 
-d$.length()
-d$keys
-d$.getitem(1)
+bdb_dataset$.length()
+bdb_dataset$keys
+bdb_dataset$.getitem(1)
 
-test_loader <- torch::dataloader(d, batch_size =  64, shuffle = TRUE)
+# load to dataloader object
+test_loader <- torch::dataloader(bdb_dataset, batch_size =  64, shuffle = TRUE)
+
 # Iterate through the dataloader and print the shapes
-
 # we can then loop trough the elements of the dataloader with
+# pulled from https://torch.mlverse.org/docs/articles/examples/dataset
 coro::loop(for(batch in dl) {
   cat("X size:  ")
   print(batch[[1]]$size())
