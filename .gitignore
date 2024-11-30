@@ -4,3 +4,4 @@ raw-data/
 *.wal
 .env
 venv/
+.Rproj.user
