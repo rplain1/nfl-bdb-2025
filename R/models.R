@@ -87,27 +87,28 @@ sports_transformer <- nn_module(
   }
 )
 
+# development
 
-# Instantiate the model
-feature_len <- 10
-model_dim <- 32
-num_layers <- 2
-output_dim <- 7 # offense formation
-dropout <- 0.3
+# # Instantiate the model
+# feature_len <- 10
+# model_dim <- 32
+# num_layers <- 2
+# output_dim <- 7 # offense formation
+# dropout <- 0.3
 
-model <- sports_transformer(
-  feature_len = feature_len,
-  model_dim = model_dim,
-  num_layers = num_layers,
-  output_dim = output_dim,
-  dropout = dropout
-)
+# model <- sports_transformer(
+#   feature_len = feature_len,
+#   model_dim = model_dim,
+#   num_layers = num_layers,
+#   output_dim = output_dim,
+#   dropout = dropout
+# )
 
-# Create example input data
-batch_size <- 4
-num_players <- 22
-input_tensor <- torch_randn(c(batch_size, num_players, feature_len)) # [B, P, F]
+# # Create example input data
+# batch_size <- 4
+# num_players <- 22
+# input_tensor <- torch_randn(c(batch_size, num_players, feature_len)) # [B, P, F]
 
-# Run the forward pass
-output <- model(input_tensor)
-cat("Output shape: ", dim(output), "\n")
+# # Run the forward pass
+# output <- model(input_tensor)
+# cat("Output shape: ", dim(output), "\n")
