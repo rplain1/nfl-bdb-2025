@@ -25,16 +25,16 @@ model <- sports_transformer(
   dropout = dropout
 )
 
-train_loader <- torch::dataloader(readRDS('datasets/R/train_dataset.rds'), batch_size =  64, shuffle = TRUE)
-val_loader <- torch::dataloader(readRDS('datasets/R/val_dataset.rds'), batch_size =  64, shuffle = TRUE)
+train_loader <- torch::dataloader(readRDS('datasets/R/train_dataset.rds'), batch_size =  16, shuffle = TRUE)
+val_loader <- torch::dataloader(readRDS('datasets/R/val_dataset.rds'), batch_size =  16, shuffle = TRUE)
 
 #accuracies <- torch_zeros(length(folds))
 #best_epochs <- torch_zeros(length(folds))
 
 epochs <- 50
 
-optimizer <- optim_adam(model$parameters, lr = 0.001)
-scheduler <- lr_step(optimizer, step_size = 1, 0.975)
+optimizer <- optim_adam(model$parameters, lr = 0.01)
+scheduler <- lr_step(optimizer, step_size = 1, 0.95)
 
 for (epoch in 1:epochs) {
   message(epoch)
@@ -43,13 +43,20 @@ for (epoch in 1:epochs) {
   valid_accuracies <- c()
   # train step: loop over batches
   model$train()
+
+  pb <- progress::progress_bar$new(
+    total = length(train_loader),   # Total number of batches
+    format = "  Training [:bar] :percent :elapsed",
+    clear = FALSE,
+    width = 60
+  )
   coro::loop(for(b in train_loader) {
-    cat('\n', dim(b))
     optimizer$zero_grad()
     loss <- nnf_cross_entropy(model(b$features), torch_squeeze(b$target))
     loss$backward()
     optimizer$step()
     losses <- c(losses, loss$item())
+    pb$tick()
   })
   message('train complete')
   # validation step: loop over batches
