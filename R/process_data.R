@@ -18,7 +18,22 @@ BDB2025_Dataset <- torch::dataset(
     target_row <- self$tgt_df[key, ncol(self$tgt_df)]
     feature_array <- as.matrix(feature_row)  # Transform to matrix
     target_array <- as.matrix(target_row)    # Transform to matrix
+    if(dim(feature_array)[1] != 22) {
+      print(key)
+      print(feature_array)
+    }
+    # Assert dimensions for feature_array and target_array
+    assertthat::assert_that(
+      length(dim(feature_array)) == 2,  # Should be 2D (players x features)
+      dim(feature_array)[1] == 22,      # Should have 22 players
+      dim(feature_array)[2] == 5        # Should have 5 features per player
+    )
 
+    assertthat::assert_that(
+      length(dim(target_array)) == 2,   # Should be 2D (batch_size x 1)
+      dim(target_array)[1] == 1,        # Should be a single row (1 sample)
+      dim(target_array)[2] == 1         # Should have a single column (1 target value)
+    )
     list(features = torch_tensor(feature_array), target = torch_tensor(target_array))
   }
 )

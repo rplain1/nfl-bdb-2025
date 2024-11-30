@@ -132,6 +132,7 @@ get_offense_formation <- function(tracking, plays) {
   checkmate::assert_data_table(tracking)
   checkmate::assert_data_table(plays)
 
+
   plays <- plays[!is.na(offenseFormation)]
   checkmate::check_character(unique(plays[!is.na(offenseFormation), offenseFormation]), any.missing = FALSE)
 
@@ -202,7 +203,7 @@ prep_data <- function() {
   message('Getting target data')
   train_target_data <- get_offense_formation(tracking, plays)
 
-  ids <- split_data(tracking)
+  ids <- split_data(train_target_data[['tracking_df']])
   # loop over the combination of train/val/test and feature/target datasets
   lapply(names(ids), function(id_name) {
   message("Processing ", id_name)
@@ -211,6 +212,15 @@ prep_data <- function() {
     keycols <- c('gameId','playId', 'mirrored', 'frameId')
     #inner join
     tmp <- process_split_data(train_target_data, data_name, ids[[id_name]], keycols)
+
+    # Check dimensions of features and targets before proceeding
+    if (data_name == 'tracking_df') {
+      assertthat::assert_that(all(tmp[, .N, by = keycols]$N == 22))  # Assert 22 players
+    }
+    if (data_name == 'offense_formation') {
+      assertthat::assert_that(all(tmp[, .N, by = keycols]$N == 1))
+    }
+
     data_name <- ifelse(data_name == 'tracking_df','features', 'targets')
     id_name <- gsub('_ids', '', id_name)
     file_name <- paste0('split_prepped_data/', id_name, "_", data_name, ".parquet")

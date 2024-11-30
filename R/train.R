@@ -46,13 +46,9 @@ for (epoch in 1:epochs) {
   coro::loop(for(b in train_loader) {
     cat('\n', dim(b))
     optimizer$zero_grad()
-    message('optimizer')
-    loss <- nnf_cross_entropy(model(b$features), b$target)
-    message('loss')
+    loss <- nnf_cross_entropy(model(b$features), torch_squeeze(b$target))
     loss$backward()
-    message('backprop')
     optimizer$step()
-    message('forward')
     losses <- c(losses, loss$item())
   })
   message('train complete')
@@ -61,7 +57,7 @@ for (epoch in 1:epochs) {
   coro::loop(for(b in val_loader) {
     output <- model(b$features)
 
-    valid_losses <- c(valid_losses, nnf_cross_entropy(output, b$target)$item())
+    valid_losses <- c(valid_losses, nnf_cross_entropy(output, torch_squeeze(b$target))$item())
 
     pred <- torch_max(output, dim = 2)[[2]]
     correct <- (pred == b$features)$sum()$item()

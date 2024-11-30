@@ -69,18 +69,18 @@ sports_transformer <- nn_module(
     x <- x$permute(c(1, 3, 2))
 
     # embed features
-    x <- self$feature_embedding_layer(x)
+    x <- self$feature_embedding_layer(x) # [B, P, F] -> [B, P, M: model_dim]
 
     # apply transformer encoder
-    # x <- sefl$transfromer_encoder(x)
+    # x <- sefl$transfromer_encoder(x) [B, P, M] -> [B, P, M]
 
     # pool over player dimension
     x <- x$permute(c(1, 3, 2))
     x <- self$player_pooling_layer(x)
-    x <- torch_squeeze(x, dim = -1)
+    x <- torch_squeeze(x) # [B, M]
 
     # decode to predict output
-    x <- self$decoder(x)
+    x <- self$decoder(x) # [B, output_dim]
 
     return(x)
 
