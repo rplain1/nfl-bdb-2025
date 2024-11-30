@@ -23,27 +23,42 @@ BDB2025_Dataset <- torch::dataset(
   }
 )
 
-# load to dataset object
-feature_df <- arrow::read_parquet('split_prepped_data/test_features.parquet')
-tgt_df <- arrow::read_parquet('split_prepped_data/test_targets.parquet')
-set(tgt_df, j = ncol(tgt_df), value = as.numeric(factor(tgt_df[[ncol(tgt_df)]])))
-bdb_dataset <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
+process_data <- function() {
+  for (split in c('train', 'val', 'test')) {
+    message(glue::glue('Creating {split} dataset'))
+    feature_df <- arrow::read_parquet(glue::glue('split_prepped_data/{split}_features.parquet'))
+    tgt_df <- arrow::read_parquet(glue::glue('split_prepped_data/{split}_targets.parquet'))
+    set(tgt_df, j = ncol(tgt_df), value = as.numeric(factor(tgt_df[[ncol(tgt_df)]])))
+    bdb_dataset <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
+    message(glue::glue('Writing {split} dataset'))
+    saveRDS(bdb_dataset, glue::glue('datasets/R/{split}_dataset.rds'))
+  }
+}
 
-bdb_dataset$.length()
-bdb_dataset$keys
-bdb_dataset$.getitem(1)
 
-# load to dataloader object
-test_loader <- torch::dataloader(bdb_dataset, batch_size =  64, shuffle = TRUE)
+# development
 
-# Iterate through the dataloader and print the shapes
-# we can then loop trough the elements of the dataloader with
-# pulled from https://torch.mlverse.org/docs/articles/examples/dataset
-coro::loop(for(batch in test_loader) {
-  cat("X size:  ")
-  print(batch[[1]]$size())
-  cat("Y size:  ")
-  print(batch[[2]]$size())
+# # load to dataset object
+# feature_df <- arrow::read_parquet('split_prepped_data/test_features.parquet')
+# tgt_df <- arrow::read_parquet('split_prepped_data/test_targets.parquet')
+# set(tgt_df, j = ncol(tgt_df), value = as.numeric(factor(tgt_df[[ncol(tgt_df)]])))
+# bdb_dataset <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
 
-  break
-})
+# bdb_dataset$.length()
+# bdb_dataset$keys
+# bdb_dataset$.getitem(1)
+
+# # load to dataloader object
+# test_loader <- torch::dataloader(bdb_dataset, batch_size =  64, shuffle = TRUE)
+
+# # Iterate through the dataloader and print the shapes
+# # we can then loop trough the elements of the dataloader with
+# # pulled from https://torch.mlverse.org/docs/articles/examples/dataset
+# coro::loop(for(batch in test_loader) {
+#   cat("X size:  ")
+#   print(batch[[1]]$size())
+#   cat("Y size:  ")
+#   print(batch[[2]]$size())
+
+#   break
+# })

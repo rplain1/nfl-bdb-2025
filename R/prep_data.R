@@ -171,20 +171,6 @@ split_data <- function(tracking, keycols = c("gameId", "playId", 'mirrored', 'fr
   )
 }
 
-set.seed(527)
-tracking <- get_tracking_dt()
-players <- get_players_dt()
-plays <- get_plays_dt()
-
-tracking <- clean_tracking(tracking = tracking, plays = plays, players = players) |>
-  convert_tracking_to_cartesian() |>
-  standardize_tracking_directions() |>
-  augment_mirror_tracking()
-
-train_target_data <- get_offense_formation(tracking, plays)
-
-ids <- split_data(tracking)
-
 process_split_data <- function(data_list, data_name, ids, keycols) {
   setkeyv(data_list[[data_name]], keycols)
   setkeyv(ids, keycols)
@@ -193,8 +179,25 @@ process_split_data <- function(data_list, data_name, ids, keycols) {
   return(result)
 }
 
-# loop over the combination of train/val/test and feature/target datasets
-lapply(names(ids), function(id_name) {
+prep_data <- function() {
+
+  message('Loading tracking data')
+  tracking <- get_tracking_dt()
+  message('Loading players')
+  players <- get_players_dt()
+  message('Loading plays')
+  plays <- get_plays_dt()
+  message('Cleaning tracking data')
+  tracking <- clean_tracking(tracking = tracking, plays = plays, players = players) |>
+    convert_tracking_to_cartesian() |>
+    standardize_tracking_directions() |>
+    augment_mirror_tracking()
+  message('Getting target data')
+  train_target_data <- get_offense_formation(tracking, plays)
+
+  ids <- split_data(tracking)
+  # loop over the combination of train/val/test and feature/target datasets
+  lapply(names(ids), function(id_name) {
   message("Processing ", id_name)
   lapply(names(train_target_data), function(data_name) {
     # join keys
@@ -209,3 +212,4 @@ lapply(names(ids), function(id_name) {
     arrow::write_parquet(tmp, file_name)
   })
 })
+}
