@@ -58,7 +58,7 @@ clean_tracking <- function(tracking, plays, players) {
     side = ifelse(club == possessionTeam, 1, 0)
   )]
 
-  tracking[,"possessionTeam":=NULL]
+  tracking[,possessionTeam:=NULL]
 
   checkmate::assert_true(og_len == nrow(tracking))
   tracking
@@ -128,10 +128,12 @@ sample_rows <- function(d) {
 
 # default function to get the y value of offenseFormation from Sumer
 get_offense_formation <- function(tracking, plays) {
+
   checkmate::assert_data_table(tracking)
   checkmate::assert_data_table(plays)
 
-  plays <- plays[!is.na("offenseFormation")]
+  plays <- plays[!is.na(offenseFormation)]
+  checkmate::check_character(unique(plays[!is.na(offenseFormation), offenseFormation]), any.missing = FALSE)
 
   tracking <- tracking[
     plays[, c("gameId", "playId", "offenseFormation")],
@@ -141,7 +143,7 @@ get_offense_formation <- function(tracking, plays) {
 
   offense_formation <- unique(tracking[, c('gameId', 'playId', 'mirrored', 'frameId', 'offenseFormation')])
 
-  tracking <- tracking[, "offenseFormation" := NULL]
+  tracking <- tracking[, offenseFormation := NULL]
 
   list(
     offense_formation = offense_formation,
@@ -152,7 +154,8 @@ get_offense_formation <- function(tracking, plays) {
 # split the data into train, validation, and test datasets.
 # returns a list of keys for each
 split_data <- function(tracking, keycols = c("gameId", "playId", 'mirrored', 'frameId')) {
-  #checkmate::assert_character(keycols)
+  checkmate::assert_data_table(tracking)
+  checkmate::assert_character(keycols)
   ids <- unique(tracking[,..keycols])
   #setorder(tracking, gameId, playId, mirrored, frameId)
 
@@ -172,9 +175,13 @@ split_data <- function(tracking, keycols = c("gameId", "playId", 'mirrored', 'fr
 }
 
 process_split_data <- function(data_list, data_name, ids, keycols) {
+  checkmate::check_list(data_list)
+  checkmate::check_tibble(!data_name %in% names(data_list))
+  checkmate::check_data_table(data_list[[data_name]])
+
   setkeyv(data_list[[data_name]], keycols)
   setkeyv(ids, keycols)
-    result <- data_list[[data_name]][ids]
+  result <- data_list[[data_name]][ids]
 
   return(result)
 }
