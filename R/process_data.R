@@ -7,7 +7,12 @@ BDB2025_Dataset <- torch::dataset(
   initialize = function(feature_df, tgt_df) {
     self$feature_df <- feature_df
     self$tgt_df <- tgt_df
-    self$keys <- unique(feature_df[, c("gameId", "playId", "mirrored", 'frameId')])
+    self$keys <- unique(feature_df[, c(
+      "gameId",
+      "playId",
+      "mirrored",
+      'frameId'
+    )])
   },
   .length = function() {
     nrow(self$keys)
@@ -16,30 +21,55 @@ BDB2025_Dataset <- torch::dataset(
     key <- self$keys[idx, ]
     feature_row <- self$feature_df[key, .(x, y, vx, vy, side)]
     target_row <- self$tgt_df[key, ncol(self$tgt_df)]
-    feature_array <- as.matrix(feature_row)  # Transform to matrix
-    target_array <- as.matrix(target_row)    # Transform to matrix
+    feature_array <- as.matrix(feature_row) # Transform to matrix
+    target_array <- as.matrix(target_row) # Transform to matrix
+    if (dim(feature_array)[1] != 22) {
+      print(key)
+      print(feature_array)
+    }
+    # Assert dimensions for feature_array and target_array
+    assertthat::assert_that(
+      length(dim(feature_array)) == 2, # Should be 2D (players x features)
+      dim(feature_array)[1] == 22, # Should have 22 players
+      dim(feature_array)[2] == 5 # Should have 5 features per player
+    )
 
-    list(features = torch_tensor(feature_array), target = torch_tensor(target_array))
+    assertthat::assert_that(
+      length(dim(target_array)) == 2, # Should be 2D (batch_size x 1)
+      dim(target_array)[1] == 1, # Should be a single row (1 sample)
+      dim(target_array)[2] == 1 # Should have a single column (1 target value)
+    )
+    list(
+      features = torch_tensor(feature_array),
+      target = torch_tensor(target_array)
+    )
   }
 )
 
 process_data <- function() {
   for (split in c('train', 'val', 'test')) {
     message(glue::glue('Creating {split} dataset'))
-    feature_df <- arrow::read_parquet(glue::glue('split_prepped_data/{split}_features.parquet'))
-    tgt_df <- arrow::read_parquet(glue::glue('split_prepped_data/{split}_targets.parquet'))
-    set(tgt_df, j = ncol(tgt_df), value = as.numeric(factor(tgt_df[[ncol(tgt_df)]])))
+    feature_df <- arrow::read_parquet(glue::glue(
+      'split_prepped_data/{split}_features.parquet'
+    ))
+    tgt_df <- arrow::read_parquet(glue::glue(
+      'split_prepped_data/{split}_targets.parquet'
+    ))
+    set(
+      tgt_df,
+      j = ncol(tgt_df),
+      value = as.numeric(factor(tgt_df[[ncol(tgt_df)]]))
+    )
     bdb_dataset <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
     message(glue::glue('Writing {split} dataset'))
     saveRDS(bdb_dataset, glue::glue('datasets/R/{split}_dataset.rds'))
   }
 }
 
-
 # development
 
 # # load to dataset object
-# feature_df <- arrow::read_parquet('split_prepped_data/test_features.parquet')
+#feature_df <- arrow::read_parquet('split_prepped_data/test_features.parquet')
 # tgt_df <- arrow::read_parquet('split_prepped_data/test_targets.parquet')
 # set(tgt_df, j = ncol(tgt_df), value = as.numeric(factor(tgt_df[[ncol(tgt_df)]])))
 # bdb_dataset <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
