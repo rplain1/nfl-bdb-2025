@@ -25,8 +25,16 @@ model <- sports_transformer(
   dropout = dropout
 )
 
-train_loader <- torch::dataloader(readRDS('datasets/R/train_dataset.rds'), batch_size =  16, shuffle = TRUE)
-val_loader <- torch::dataloader(readRDS('datasets/R/val_dataset.rds'), batch_size =  16, shuffle = TRUE)
+train_loader <- torch::dataloader(
+  readRDS('datasets/R/train_dataset.rds'),
+  batch_size = 16,
+  shuffle = TRUE
+)
+val_loader <- torch::dataloader(
+  readRDS('datasets/R/val_dataset.rds'),
+  batch_size = 16,
+  shuffle = TRUE
+)
 
 #accuracies <- torch_zeros(length(folds))
 #best_epochs <- torch_zeros(length(folds))
@@ -45,37 +53,39 @@ for (epoch in 1:epochs) {
   model$train()
 
   pb <- progress::progress_bar$new(
-    total = length(train_loader),   # Total number of batches
+    total = length(train_loader), # Total number of batches
     format = "  Training [:bar] :percent :elapsed",
     clear = FALSE,
     width = 60
   )
-  coro::loop(for(b in train_loader) {
-    optimizer$zero_grad()
-    loss <- nnf_cross_entropy(model(b$features), torch_squeeze(b$target))
-    loss$backward()
-    optimizer$step()
-    losses <- c(losses, loss$item())
-    pb$tick()
-  })
+  coro::loop(
+    for (b in train_loader) {
+      optimizer$zero_grad()
+      loss <- nnf_cross_entropy(model(b$features), torch_squeeze(b$target))
+      loss$backward()
+      optimizer$step()
+      losses <- c(losses, loss$item())
+      pb$tick()
+    }
+  )
   message('train complete')
   # validation step: loop over batches
-  model$eval()
-  coro::loop(for(b in val_loader) {
-    output <- model(b$features)
+  # model$eval()
+  # coro::loop(for(b in val_loader) {
+  #   output <- model(b$features)
 
-    valid_losses <- c(valid_losses, nnf_cross_entropy(output, torch_squeeze(b$target))$item())
+  #   valid_losses <- c(valid_losses, nnf_cross_entropy(output, torch_squeeze(b$target))$item())
 
-    pred <- torch_max(output, dim = 2)[[2]]
-    correct <- (pred == b$features)$sum()$item()
-    valid_accuracies <- c(valid_accuracies, correct / length(b$target))
-  })
+  #   pred <- torch_max(output, dim = 2)[[2]]
+  #   correct <- (pred == b$features)$sum()$item()
+  #   valid_accuracies <- c(valid_accuracies, correct / length(b$target))
+  # })
 
-  scheduler$step()
+  # scheduler$step()
 
-  if (epoch %% 10 == 0) {
-    cat(sprintf("\nLoss at epoch %d: training: %1.4f, validation: %1.4f // validation accuracy %1.4f", epoch, mean(losses), mean(valid_losses), mean(valid_accuracies)))
-  }
+  # if (epoch %% 10 == 0) {
+  #   cat(sprintf("\nLoss at epoch %d: training: %1.4f, validation: %1.4f // validation accuracy %1.4f", epoch, mean(losses), mean(valid_losses), mean(valid_accuracies)))
+  # }
   break
   # if (mean(valid_accuracies) > as.numeric(accuracies[fold])) {
   #   message(glue::glue("Fold {fold}: New best at epoch {epoch} ({round(mean(valid_accuracies), 3)}). Saving model"))
