@@ -5,3 +5,4 @@ raw-data/
 .env
 venv/
 .Rproj.user
+.Rhistory
