@@ -87,7 +87,7 @@ process_data <- function() {
     )
 
     keys <- unique(feature_df[, .(gameId, playId, mirrored, frameId)])
-    keys_subset <- keys[1:100000] # take first 100 for testing
+    keys_subset <- keys[1:100000] # take first N for testing
 
     feature_df <- feature_df[
       keys_subset,

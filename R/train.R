@@ -56,7 +56,7 @@ optimizer <- optim_adam(model$parameters, lr = 0.01)
 scheduler <- lr_step(optimizer, step_size = 1, 0.95)
 
 
-num_folds <- 5 # or however many folds you have
+num_folds <- 5
 accuracies <- rep(0, num_folds)
 best_epochs <- rep(0, num_folds)
 
