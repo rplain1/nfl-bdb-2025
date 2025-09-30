@@ -17,7 +17,7 @@ BDB2025_Dataset <- torch::dataset(
   .length = function() {
     nrow(self$keys)
   },
-  .getitem = function(idx) {
+  .getbatch = function(idx) {
     key <- self$keys[idx, ]
     feature_row <- self$feature_df[key, .(x, y, vx, vy, side)]
     target_row <- self$tgt_df[key, ncol(self$tgt_df)]
@@ -62,7 +62,7 @@ process_data <- function() {
     )
     bdb_dataset <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
     message(glue::glue('Writing {split} dataset'))
-    saveRDS(bdb_dataset, glue::glue('datasets/R/{split}_dataset.rds'))
+    torch_save(bdb_dataset, glue::glue('datasets/R/{split}_dataset.pt'))
   }
 }
 

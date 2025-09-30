@@ -6,7 +6,7 @@ torch_manual_seed(527)
 source('R/prep_data.R')
 source('R/process_data.R')
 source('R/models.R')
-prep_data()
+#prep_data()
 process_data()
 
 
@@ -25,26 +25,34 @@ model <- sports_transformer(
   dropout = dropout
 )
 
-train_loader <- torch::dataloader(
-  readRDS('datasets/R/train_dataset.rds'),
-  batch_size = 16,
-  shuffle = TRUE
-)
-val_loader <- torch::dataloader(
-  readRDS('datasets/R/val_dataset.rds'),
-  batch_size = 16,
-  shuffle = TRUE
-)
+device <- torch_device('mps')
+model$to(device = device)
 
-#accuracies <- torch_zeros(length(folds))
-#best_epochs <- torch_zeros(length(folds))
+# Load raw data
+train_data <- torch_load('datasets/R/train_dataset.pt')
+val_data <- torch_load('datasets/R/val_dataset.pt')
+
+# Create dataloaders
+train_loader <- torch::dataloader(
+  train_data,
+  batch_size = 16,
+  shuffle = TRUE
+)
+val_loader <- torch::dataloader(val_data, batch_size = 16, shuffle = TRUE)
+
+folds <- 1
+
+accuracies <- torch_zeros(length(folds))
+best_epochs <- torch_zeros(length(folds))
 
 epochs <- 50
 
 optimizer <- optim_adam(model$parameters, lr = 0.01)
 scheduler <- lr_step(optimizer, step_size = 1, 0.95)
 
+
 for (epoch in 1:epochs) {
+  tictoc::tic()
   message(epoch)
   losses <- c()
   valid_losses <- c()
@@ -60,8 +68,11 @@ for (epoch in 1:epochs) {
   )
   coro::loop(
     for (b in train_loader) {
+      features <- b$features$to(device = device)
+      target <- b$target$to(device = device)
+
       optimizer$zero_grad()
-      loss <- nnf_cross_entropy(model(b$features), torch_squeeze(b$target))
+      loss <- nnf_cross_entropy(model(features), torch_squeeze(target))
       loss$backward()
       optimizer$step()
       losses <- c(losses, loss$item())
@@ -69,31 +80,46 @@ for (epoch in 1:epochs) {
     }
   )
   message('train complete')
+  tictoc::toc()
   # validation step: loop over batches
-  # model$eval()
-  # coro::loop(for(b in val_loader) {
-  #   output <- model(b$features)
+  model$eval()
+  coro::loop(
+    for (b in val_loader) {
+      features <- b$features$to(device = device)
+      target <- b$target$to(device = device)
 
-  #   valid_losses <- c(valid_losses, nnf_cross_entropy(output, torch_squeeze(b$target))$item())
+      output <- model(features)
+      valid_losses <- c(
+        valid_losses,
+        nnf_cross_entropy(output, torch_squeeze(target))$item()
+      )
+      pred <- torch_max(output, dim = 2)[[2]]
+      correct <- (pred == target)$sum()$item()
+      valid_accuracies <- c(valid_accuracies, correct / length(target))
+    }
+  )
 
-  #   pred <- torch_max(output, dim = 2)[[2]]
-  #   correct <- (pred == b$features)$sum()$item()
-  #   valid_accuracies <- c(valid_accuracies, correct / length(b$target))
-  # })
+  scheduler$step()
 
-  # scheduler$step()
+  if (epoch %% 10 == 0) {
+    cat(sprintf(
+      "\nLoss at epoch %d: training: %1.4f, validation: %1.4f // validation accuracy %1.4f",
+      epoch,
+      mean(losses),
+      mean(valid_losses),
+      mean(valid_accuracies)
+    ))
+  }
+  #break
+  if (mean(valid_accuracies) > as.numeric(accuracies[fold])) {
+    message(glue::glue(
+      "Fold {fold}: New best at epoch {epoch} ({round(mean(valid_accuracies), 3)}). Saving model"
+    ))
 
-  # if (epoch %% 10 == 0) {
-  #   cat(sprintf("\nLoss at epoch %d: training: %1.4f, validation: %1.4f // validation accuracy %1.4f", epoch, mean(losses), mean(valid_losses), mean(valid_accuracies)))
-  # }
-  break
-  # if (mean(valid_accuracies) > as.numeric(accuracies[fold])) {
-  #   message(glue::glue("Fold {fold}: New best at epoch {epoch} ({round(mean(valid_accuracies), 3)}). Saving model"))
+    torch_save(model, glue::glue("best_model_{fold}.pt"))
 
-  #   torch_save(model, glue::glue("best_model_{fold}.pt"))
-
-  #   # save new best loss
-  #   accuracies[fold] <- mean(valid_accuracies)
-  #   best_epochs[fold] <- epoch
-  # }
+    # save new best loss
+    accuracies[fold] <- mean(valid_accuracies)
+    best_epochs[fold] <- epoch
+  }
 }
