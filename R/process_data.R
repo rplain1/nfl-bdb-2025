@@ -5,14 +5,15 @@ library(torch)
 BDB2025_Dataset <- torch::dataset(
   name = "BDB2025_Dataset",
   initialize = function(feature_df, tgt_df) {
-    self$feature_df <- feature_df
-    self$tgt_df <- tgt_df
     self$keys <- unique(feature_df[, c(
       "gameId",
       "playId",
       "mirrored",
       'frameId'
     )])
+
+    self$feature_df <- feature_df
+    self$tgt_df <- tgt_df
   },
   .length = function() {
     nrow(self$keys)
@@ -20,20 +21,28 @@ BDB2025_Dataset <- torch::dataset(
   .getbatch = function(idx) {
     B <- length(idx)
 
-    feature_array <- array(NA_real_, dim = c(B, 22L, 5L))
-    target_array <- array(NA_real_, dim = (B))
-
     target_col <- names(self$tgt_df)[ncol(self$tgt_df)]
+    # Use data.table join to get all features at once
+    keys_subset <- self$keys[idx, ]
+    feature_sub <- self$feature_df[
+      keys_subset,
+      on = .(gameId, playId, mirrored, frameId)
+    ]
+    target_sub <- self$tgt_df[
+      keys_subset,
+      on = .(gameId, playId, mirrored, frameId)
+    ]
 
-    for (i in seq_along(idx)) {
-      key <- self$keys[idx[i], ]
-      feature_row <- self$feature_df[key, .(x, y, vx, vy, side)]
-      target_row <- self$tgt_df[key, ..target_col]
-      feature_array[i, , ] <- as.matrix(feature_row) # Transform to matrix
-      target_array[[i]] <- target_row[[1]] # Transform to matrix
-    }
+    # Convert features to 3D array: B x 22 x 5
+    feature_array <- array(
+      as.numeric(unlist(feature_sub[, .(x, y, vx, vy, side)])),
+      dim = c(B, 22, 5)
+    )
+
+    # Convert targets to integer vector
+    target_array <- as.integer(target_sub[[target_col]])
     # .getbatch change requires 22 -> 352
-    if (dim(feature_array)[1] != 16) {
+    if (dim(feature_array)[1] != B) {
       print('wtf')
       print(key)
       print(feature_array)
@@ -46,14 +55,18 @@ BDB2025_Dataset <- torch::dataset(
       dim(feature_array)[3] == 5 # Should have 5 features per player,
     )
 
-    assertthat::assert_that(
-      dim(target_array) == 16 # Should be 2D (batch_size x 1)
-      # dim(target_array)[1] == 1, # Should be a single row (1 sample)
-      # dim(target_array)[2] == 1 # Should have a single column (1 target value)
-    )
+    # assertthat::assert_that(
+    #   dim(target_array) == B # Should be 2D (batch_size x 1)
+    #   # dim(target_array)[1] == 1, # Should be a single row (1 sample)
+    #   # dim(target_array)[2] == 1 # Should have a single column (1 target value)
+    # )
     list(
-      features = torch_tensor(feature_array),
-      target = torch_tensor(target_array)
+      features = torch_tensor(
+        feature_array,
+        dtype = torch_float(),
+        device = 'mps'
+      ),
+      target = torch_tensor(target_array, dtype = torch_long(), device = 'mps')
     )
   }
 )
@@ -73,6 +86,21 @@ process_data <- function() {
       j = ncol(tgt_df),
       value = as.numeric(factor(tgt_df[[ncol(tgt_df)]]))
     )
+
+    keys <- unique(feature_df[, .(gameId, playId, mirrored, frameId)])
+    keys_subset <- keys[1:100000] # take first 100 for testing
+
+    feature_df <- feature_df[
+      keys_subset,
+      on = .(gameId, playId, mirrored, frameId),
+      nomatch = 0
+    ]
+    tgt_df <- tgt_df[
+      keys_subset,
+      on = .(gameId, playId, mirrored, frameId),
+      nomatch = 0
+    ]
+
     bdb_dataset <- BDB2025_Dataset(feature_df = feature_df, tgt_df = tgt_df)
     message(glue::glue('Writing {split} dataset'))
     torch_save(bdb_dataset, glue::glue('datasets/R/{split}_dataset.pt'))

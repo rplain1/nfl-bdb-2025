@@ -4,6 +4,7 @@ library(data.table)
 get_tracking_dt <- function() {
   tracking <- fread('raw-data/tracking_week_1.csv', na.strings = 'NA')
   tracking <- tracking[displayName != "football"]
+
   tracking
 }
 
@@ -153,8 +154,6 @@ get_offense_formation <- function(tracking, plays) {
     'frameId',
     'offenseFormation'
   )])
-
-  tracking <- tracking[, offenseFormation := NULL]
 
   list(
     offense_formation = offense_formation,
