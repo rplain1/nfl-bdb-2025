@@ -18,26 +18,38 @@ BDB2025_Dataset <- torch::dataset(
     nrow(self$keys)
   },
   .getbatch = function(idx) {
-    key <- self$keys[idx, ]
-    feature_row <- self$feature_df[key, .(x, y, vx, vy, side)]
-    target_row <- self$tgt_df[key, ncol(self$tgt_df)]
-    feature_array <- as.matrix(feature_row) # Transform to matrix
-    target_array <- as.matrix(target_row) # Transform to matrix
-    if (dim(feature_array)[1] != 22) {
+    B <- length(idx)
+
+    feature_array <- array(NA_real_, dim = c(B, 22L, 5L))
+    target_array <- array(NA_real_, dim = (B))
+
+    target_col <- names(self$tgt_df)[ncol(self$tgt_df)]
+
+    for (i in seq_along(idx)) {
+      key <- self$keys[idx[i], ]
+      feature_row <- self$feature_df[key, .(x, y, vx, vy, side)]
+      target_row <- self$tgt_df[key, ..target_col]
+      feature_array[i, , ] <- as.matrix(feature_row) # Transform to matrix
+      target_array[[i]] <- target_row[[1]] # Transform to matrix
+    }
+    # .getbatch change requires 22 -> 352
+    if (dim(feature_array)[1] != 16) {
+      print('wtf')
       print(key)
       print(feature_array)
     }
+
     # Assert dimensions for feature_array and target_array
     assertthat::assert_that(
-      length(dim(feature_array)) == 2, # Should be 2D (players x features)
-      dim(feature_array)[1] == 22, # Should have 22 players
-      dim(feature_array)[2] == 5 # Should have 5 features per player
+      length(dim(feature_array)) == 3, # Should be 3D (batch x players x features)
+      dim(feature_array)[2] == 22, # Should have 22 players
+      dim(feature_array)[3] == 5 # Should have 5 features per player,
     )
 
     assertthat::assert_that(
-      length(dim(target_array)) == 2, # Should be 2D (batch_size x 1)
-      dim(target_array)[1] == 1, # Should be a single row (1 sample)
-      dim(target_array)[2] == 1 # Should have a single column (1 target value)
+      dim(target_array) == 16 # Should be 2D (batch_size x 1)
+      # dim(target_array)[1] == 1, # Should be a single row (1 sample)
+      # dim(target_array)[2] == 1 # Should have a single column (1 target value)
     )
     list(
       features = torch_tensor(feature_array),
@@ -47,7 +59,8 @@ BDB2025_Dataset <- torch::dataset(
 )
 
 process_data <- function() {
-  for (split in c('train', 'val', 'test')) {
+  # TODO: removing test for dev
+  for (split in c('train', 'val')) {
     message(glue::glue('Creating {split} dataset'))
     feature_df <- arrow::read_parquet(glue::glue(
       'split_prepped_data/{split}_features.parquet'

@@ -32,13 +32,19 @@ model$to(device = device)
 train_data <- torch_load('datasets/R/train_dataset.pt')
 val_data <- torch_load('datasets/R/val_dataset.pt')
 
+batch_size <- 16
+
 # Create dataloaders
 train_loader <- torch::dataloader(
   train_data,
-  batch_size = 16,
+  batch_size = batch_size,
   shuffle = TRUE
 )
-val_loader <- torch::dataloader(val_data, batch_size = 16, shuffle = TRUE)
+val_loader <- torch::dataloader(
+  val_data,
+  batch_size = batch_size,
+  shuffle = TRUE
+)
 
 folds <- 1
 
@@ -72,6 +78,7 @@ for (epoch in 1:epochs) {
       target <- b$target$to(device = device)
 
       optimizer$zero_grad()
+
       loss <- nnf_cross_entropy(model(features), torch_squeeze(target))
       loss$backward()
       optimizer$step()
@@ -89,6 +96,7 @@ for (epoch in 1:epochs) {
       target <- b$target$to(device = device)
 
       output <- model(features)
+
       valid_losses <- c(
         valid_losses,
         nnf_cross_entropy(output, torch_squeeze(target))$item()
